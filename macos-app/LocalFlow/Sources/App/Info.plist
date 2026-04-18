@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.localflow.macos</string>
+    <key>CFBundleName</key>
+    <string>LocalFlow</string>
+    <key>CFBundleDisplayName</key>
+    <string>LocalFlow</string>
+    <key>CFBundleExecutable</key>
+    <string>LocalFlow</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_localflow._tcp</string>
+    </array>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>LocalFlow needs local network access to receive audio from your Android device.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Not used — LocalFlow receives audio from Android devices.</string>
+</dict>
+</plist>

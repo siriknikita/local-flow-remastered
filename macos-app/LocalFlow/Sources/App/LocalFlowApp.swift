@@ -3,10 +3,12 @@ import SwiftUI
 @main
 struct LocalFlowApp: App {
     @StateObject private var appState = AppState()
+    @Environment(\.openSettings) private var openSettings
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView()
+            MenuBarView(openSettings: { activateAndOpenSettings() })
                 .environmentObject(appState)
         } label: {
             Image(systemName: appState.isServerRunning ? "waveform.circle.fill" : "waveform.circle")
@@ -15,6 +17,37 @@ struct LocalFlowApp: App {
         Settings {
             SettingsView()
                 .environmentObject(appState)
+                .onAppear {
+                    NSApp.setActivationPolicy(.regular)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+        }
+    }
+
+    private func activateAndOpenSettings() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var windowObserver: Any?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        windowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                let hasVisibleWindows = NSApp.windows.contains {
+                    $0.isVisible && !$0.className.contains("StatusBar")
+                }
+                if !hasVisibleWindows {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
         }
     }
 }

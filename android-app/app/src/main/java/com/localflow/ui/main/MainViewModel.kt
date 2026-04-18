@@ -115,7 +115,11 @@ class MainViewModel @Inject constructor(
         val device = pairedDevice.value ?: return
 
         viewModelScope.launch {
-            uploadManager.upload(device, file)
+            val result = uploadManager.upload(device, file)
+            if (result is UploadResult.Success) {
+                delay(3000)
+                uploadManager.resetState()
+            }
         }
     }
 

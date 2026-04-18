@@ -2,113 +2,158 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
+    var openSettings: () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Status
-            HStack {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 8) {
                 Circle()
                     .fill(appState.isServerRunning ? .green : .red)
                     .frame(width: 8, height: 8)
-                Text(appState.isServerRunning ? "Server Running" : "Server Stopped")
-                    .font(.headline)
+                Text(appState.isServerRunning ? "Running" : "Stopped")
+                    .font(.system(.body, weight: .medium))
                 Spacer()
-                Text(":\(appState.serverPort)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if appState.isServerRunning {
+                    Text("port \(appState.serverPort)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
-
-            if !appState.lastEvent.isEmpty {
-                Text(appState.lastEvent)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             Divider()
 
-            // Paired devices
-            if !appState.pairedDevices.isEmpty {
-                Text("Paired Devices")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-                ForEach(appState.pairedDevices) { device in
+            // Pending pairing — prominent
+            if let pairing = appState.pendingPairing, !pairing.isExpired {
+                VStack(spacing: 6) {
                     HStack {
-                        Image(systemName: "iphone")
-                        Text(device.deviceName)
-                            .font(.caption)
+                        Image(systemName: "link.badge.plus")
+                            .foregroundStyle(.orange)
+                        Text(pairing.deviceName)
+                            .font(.system(.caption, weight: .medium))
+                        Spacer()
                     }
+                    Text(pairing.code)
+                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .kerning(6)
+                        .foregroundStyle(.primary)
                 }
+                .padding(12)
+                .background(.orange.opacity(0.08))
+
                 Divider()
             }
 
-            // Pending pairing
-            if let pairing = appState.pendingPairing, !pairing.isExpired {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Pairing Request")
-                        .font(.caption.bold())
-                        .foregroundStyle(.orange)
-                    Text(pairing.deviceName)
-                        .font(.caption)
-                    HStack {
-                        Text("Code:")
+            // Paired devices
+            if !appState.pairedDevices.isEmpty {
+                sectionHeader("Paired")
+                ForEach(appState.pairedDevices) { device in
+                    HStack(spacing: 8) {
+                        Image(systemName: "iphone")
                             .font(.caption)
-                        Text(pairing.code)
-                            .font(.system(.title2, design: .monospaced).bold())
+                            .foregroundStyle(.secondary)
+                        Text(device.deviceName)
+                            .font(.system(.caption))
+                        Spacer()
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 3)
                 }
+                .padding(.bottom, 4)
+
                 Divider()
             }
 
             // Recent uploads
             if !appState.recentUploads.isEmpty {
-                Text("Recent Uploads")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-                ForEach(appState.recentUploads.prefix(5)) { upload in
-                    HStack {
+                sectionHeader("Recent")
+                ForEach(appState.recentUploads.prefix(3)) { upload in
+                    HStack(spacing: 8) {
                         Image(systemName: statusIcon(upload.transcriptionStatus))
+                            .font(.caption)
                             .foregroundStyle(statusColor(upload.transcriptionStatus))
-                        VStack(alignment: .leading) {
-                            Text(upload.filename)
-                                .font(.caption)
-                                .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(formatUploadTime(upload.receivedAt))
+                                .font(.system(.caption))
                             Text(upload.deviceName)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .font(.system(.caption2))
+                                .foregroundStyle(.tertiary)
                         }
+                        Spacer()
+                        Text(formatFileSize(upload.fileSize))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.tertiary)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 3)
                 }
+                .padding(.bottom, 4)
+
                 Divider()
             }
 
             // Controls
-            Button(appState.isServerRunning ? "Stop Server" : "Start Server") {
-                if appState.isServerRunning {
+            VStack(spacing: 2) {
+                menuButton(
+                    appState.isServerRunning ? "Stop Server" : "Start Server",
+                    icon: appState.isServerRunning ? "stop.circle" : "play.circle"
+                ) {
+                    if appState.isServerRunning {
+                        appState.stopServer()
+                    } else {
+                        appState.startServer()
+                    }
+                }
+
+                menuButton("Settings...", icon: "gear") {
+                    openSettings()
+                }
+
+                Divider()
+                    .padding(.vertical, 2)
+
+                menuButton("Quit LocalFlow", icon: "xmark.circle") {
                     appState.stopServer()
-                } else {
-                    appState.startServer()
+                    NSApplication.shared.terminate(nil)
                 }
             }
-
-            SettingsLink {
-                Text("Settings...")
-            }
-
-            Divider()
-
-            Button("Quit LocalFlow") {
-                appState.stopServer()
-                NSApplication.shared.terminate(nil)
-            }
+            .padding(.vertical, 4)
         }
-        .padding(12)
-        .frame(width: 280)
+        .frame(width: 240)
         .onAppear {
             if !appState.isServerRunning {
                 appState.startServer()
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(.caption2, weight: .semibold))
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+    }
+
+    private func menuButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .frame(width: 16)
+                Text(title)
+                Spacer()
+            }
+            .font(.system(.caption))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func statusIcon(_ status: UploadRecord.TranscriptionStatus) -> String {
@@ -129,5 +174,19 @@ struct MenuBarView: View {
         case .failed: return .red
         case .skipped: return .gray
         }
+    }
+
+    private func formatUploadTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f.string(from: date)
+    }
+
+    private func formatFileSize(_ bytes: Int64) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        let kb = Double(bytes) / 1024
+        if kb < 1024 { return String(format: "%.0f KB", kb) }
+        let mb = kb / 1024
+        return String(format: "%.1f MB", mb)
     }
 }

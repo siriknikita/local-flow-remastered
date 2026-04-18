@@ -13,7 +13,8 @@ let package = Package(
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
             ],
-            path: "Sources"
+            path: "Sources",
+            exclude: ["App/Info.plist", "App/AppIcon.icns"]
         ),
         .testTarget(
             name: "LocalFlowTests",

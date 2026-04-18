@@ -1,5 +1,6 @@
 import Vapor
 import Foundation
+import UserNotifications
 
 struct PairingController: Sendable {
     let appState: AppState
@@ -45,10 +46,9 @@ struct PairingController: Sendable {
 
         await MainActor.run {
             appState.pendingPairing = request
-            appState.lastEvent = "Pairing request from \(pairReq.deviceName) — code: \(code)"
+            appState.lastEvent = "Pairing request from \(pairReq.deviceName)"
         }
 
-        // Show system notification with code
         sendPairingNotification(deviceName: pairReq.deviceName, code: code)
 
         req.logger.info("Pairing initiated for \(pairReq.deviceName), code: \(code)")
@@ -92,6 +92,8 @@ struct PairingController: Sendable {
             appState.lastEvent = "Paired with \(pending.deviceName)"
         }
 
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["localflow-pairing"])
+
         let serverName = Host.current().localizedName ?? "Mac"
         req.logger.info("Paired with \(pending.deviceName)")
 
@@ -99,10 +101,27 @@ struct PairingController: Sendable {
     }
 
     private func sendPairingNotification(deviceName: String, code: String) {
-        let notification = NSUserNotification()
-        notification.title = "LocalFlow Pairing Request"
-        notification.informativeText = "\(deviceName) wants to pair. Code: \(code)"
-        notification.soundName = NSUserNotificationDefaultSoundName
-        NSUserNotificationCenter.default.deliver(notification)
+        let center = UNUserNotificationCenter.current()
+
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            guard granted else {
+                print("[Pairing] Notification permission denied")
+                return
+            }
+
+            let content = UNMutableNotificationContent()
+            content.title = "Pairing Code"
+            content.subtitle = deviceName
+            content.body = code
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "localflow-pairing",
+                content: content,
+                trigger: nil
+            )
+
+            center.add(request)
+        }
     }
 }

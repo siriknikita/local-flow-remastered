@@ -1,0 +1,90 @@
+# LocalFlow macOS — task runner
+
+# Default recipe: list available commands
+default:
+    @just --list
+
+# — Build ——————————————————————————————————————————
+
+# Build debug app bundle
+[group('build')]
+build:
+    #!/bin/bash
+    set -e
+    cd LocalFlow
+    echo "=== Building LocalFlow.app ==="
+    swift build -c debug
+    APP_DIR=".build/LocalFlow.app"
+    CONTENTS="$APP_DIR/Contents"
+    MACOS="$CONTENTS/MacOS"
+    rm -rf "$APP_DIR"
+    mkdir -p "$MACOS" "$CONTENTS/Resources"
+    cp .build/arm64-apple-macosx/debug/LocalFlow "$MACOS/LocalFlow"
+    cp Sources/App/Info.plist "$CONTENTS/Info.plist"
+    cp Sources/App/AppIcon.icns "$CONTENTS/Resources/AppIcon.icns"
+    echo "=== Build complete: LocalFlow/$APP_DIR ==="
+
+# Build release app bundle
+[group('build')]
+release:
+    #!/bin/bash
+    set -e
+    cd LocalFlow
+    echo "=== Building LocalFlow.app (release) ==="
+    swift build -c release
+    APP_DIR=".build/LocalFlow.app"
+    CONTENTS="$APP_DIR/Contents"
+    MACOS="$CONTENTS/MacOS"
+    rm -rf "$APP_DIR"
+    mkdir -p "$MACOS" "$CONTENTS/Resources"
+    cp .build/arm64-apple-macosx/release/LocalFlow "$MACOS/LocalFlow"
+    cp Sources/App/Info.plist "$CONTENTS/Info.plist"
+    cp Sources/App/AppIcon.icns "$CONTENTS/Resources/AppIcon.icns"
+    echo "=== Release build complete: LocalFlow/$APP_DIR ==="
+
+# Clean build artifacts
+[group('build')]
+clean:
+    cd LocalFlow && swift package clean
+
+# — Run ———————————————————————————————————————————
+
+# Build and run as app bundle
+[group('run')]
+run: build
+    open LocalFlow/.build/LocalFlow.app
+
+# Stop the running app
+[group('run')]
+stop:
+    osascript -e 'quit app "LocalFlow"' 2>/dev/null || pkill -x LocalFlow || true
+
+# Restart (stop + build + run)
+[group('run')]
+restart: stop build run
+
+# — Deploy —————————————————————————————————————————
+
+# Install to /Applications
+[group('deploy')]
+install: release stop
+    #!/bin/bash
+    set -e
+    echo "=== Installing LocalFlow.app to /Applications ==="
+    rm -rf /Applications/LocalFlow.app
+    cp -R LocalFlow/.build/LocalFlow.app /Applications/LocalFlow.app
+    echo "=== Installed. Run with: open /Applications/LocalFlow.app ==="
+    open /Applications/LocalFlow.app
+
+# Uninstall from /Applications
+[group('deploy')]
+uninstall: stop
+    rm -rf /Applications/LocalFlow.app
+    @echo "=== LocalFlow removed from /Applications ==="
+
+# — Test ——————————————————————————————————————————
+
+# Run tests
+[group('test')]
+test:
+    cd LocalFlow && swift test
