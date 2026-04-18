@@ -19,7 +19,7 @@ struct SettingsView: View {
             devicesTab
                 .tabItem { Label("Devices", systemImage: "iphone") }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 520, height: 480)
         .onAppear { loadConfig() }
     }
 
@@ -70,22 +70,57 @@ struct SettingsView: View {
     }
 
     private var devicesTab: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 16) {
+            // Pending pairing code
+            if let pairing = appState.pendingPairing, !pairing.isExpired {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "link.badge.plus")
+                            .foregroundStyle(.orange)
+                        Text("\(pairing.deviceName) wants to pair")
+                            .font(.body)
+                        Spacer()
+                    }
+                    Text(pairing.code)
+                        .font(.system(size: 48, weight: .bold, design: .monospaced))
+                        .kerning(8)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.orange.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    Text("Enter this code on your Android device")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(.orange.opacity(0.3), lineWidth: 1)
+                )
+
+                Divider()
+            }
+
+            // Paired devices
             Text("Paired Devices")
                 .font(.headline)
 
             if appState.pairedDevices.isEmpty {
-                Text("No paired devices")
+                Text("No paired devices. Open LocalFlow on your Android device to pair.")
                     .foregroundStyle(.secondary)
                     .padding()
             } else {
                 List {
                     ForEach(appState.pairedDevices) { device in
                         HStack {
+                            Image(systemName: "iphone")
+                                .foregroundStyle(.secondary)
                             VStack(alignment: .leading) {
                                 Text(device.deviceName)
                                     .font(.body)
-                                Text("Paired: \(device.pairedAt.formatted())")
+                                Text("Paired \(device.pairedAt.formatted(.relative(presentation: .named)))")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -99,8 +134,55 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            // Recent uploads
+            if !appState.recentUploads.isEmpty {
+                Divider()
+                Text("Recent Uploads")
+                    .font(.headline)
+                List {
+                    ForEach(appState.recentUploads.prefix(10)) { upload in
+                        HStack {
+                            Image(systemName: statusIcon(upload.transcriptionStatus))
+                                .foregroundStyle(statusColor(upload.transcriptionStatus))
+                            VStack(alignment: .leading) {
+                                Text(upload.filename)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Text("\(upload.deviceName) — \(upload.receivedAt.formatted(date: .omitted, time: .shortened))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(upload.transcriptionStatus.rawValue)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
         }
         .padding()
+    }
+
+    private func statusIcon(_ status: UploadRecord.TranscriptionStatus) -> String {
+        switch status {
+        case .received, .queued: return "clock"
+        case .transcribing: return "waveform"
+        case .completed: return "checkmark.circle.fill"
+        case .failed: return "xmark.circle.fill"
+        case .skipped: return "minus.circle"
+        }
+    }
+
+    private func statusColor(_ status: UploadRecord.TranscriptionStatus) -> Color {
+        switch status {
+        case .received, .queued: return .orange
+        case .transcribing: return .blue
+        case .completed: return .green
+        case .failed: return .red
+        case .skipped: return .gray
+        }
     }
 
     private func loadConfig() {

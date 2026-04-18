@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct LocalFlowApp: App {
@@ -35,6 +36,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Request notification permissions on launch
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                print("[Notifications] Permission granted")
+            } else {
+                print("[Notifications] Permission denied: \(error?.localizedDescription ?? "unknown")")
+            }
+        }
+
+        // Watch for window close to hide from dock
         windowObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: nil,
