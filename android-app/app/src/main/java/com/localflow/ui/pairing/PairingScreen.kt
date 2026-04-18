@@ -24,15 +24,17 @@ fun PairingScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val code by viewModel.code.collectAsState()
+    var hasNavigated by remember { mutableStateOf(false) }
 
-    // Auto-initiate pairing
+    // Auto-initiate pairing (guarded in ViewModel)
     LaunchedEffect(Unit) {
         viewModel.initiatePairing(host, port)
     }
 
-    // Navigate on successful pairing
+    // Navigate on successful pairing (once)
     LaunchedEffect(state) {
-        if (state is PairingState.Paired) {
+        if (state is PairingState.Paired && !hasNavigated) {
+            hasNavigated = true
             onPaired()
         }
     }
@@ -118,7 +120,7 @@ fun PairingScreen(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.initiatePairing(host, port) }) {
+                    Button(onClick = { viewModel.retryPairing(host, port) }) {
                         Text("Retry")
                     }
                 }

@@ -25,10 +25,12 @@ fun DiscoveryScreen(
     val manualHost by viewModel.manualHost.collectAsState()
     val manualPort by viewModel.manualPort.collectAsState()
     var showManualEntry by remember { mutableStateOf(false) }
+    var hasNavigated by remember { mutableStateOf(false) }
 
-    // If already paired, navigate to main
+    // If already paired, navigate to main (once)
     LaunchedEffect(pairedDevice) {
-        if (pairedDevice != null) {
+        if (pairedDevice != null && !hasNavigated) {
+            hasNavigated = true
             onAlreadyPaired()
         }
     }
@@ -38,9 +40,10 @@ fun DiscoveryScreen(
         viewModel.startDiscovery()
     }
 
-    // Navigate when device found
+    // Navigate when device found (once)
     LaunchedEffect(discoveryState) {
-        if (discoveryState is ConnectionState.Found) {
+        if (discoveryState is ConnectionState.Found && !hasNavigated) {
+            hasNavigated = true
             val found = discoveryState as ConnectionState.Found
             onDeviceFound(found.host, found.port, found.name)
         }

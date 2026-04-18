@@ -28,7 +28,7 @@ import com.localflow.model.UploadResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
     val connectionState by viewModel.connectionState.collectAsState()
     val recordingState by viewModel.recordingState.collectAsState()
     val uploadState by viewModel.uploadState.collectAsState()
@@ -73,6 +73,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             onClick = {
                                 viewModel.unpair()
                                 showMenu = false
+                                onUnpaired()
                             }
                         )
                     }

@@ -35,12 +35,16 @@ class PairingViewModel @Inject constructor(
     val code: StateFlow<String> = _code
 
     private val deviceId = UUID.randomUUID().toString()
+    private var hasPairingStarted = false
 
     fun setCode(code: String) {
         _code.value = code.filter { it.isDigit() }.take(6)
     }
 
     fun initiatePairing(host: String, port: Int) {
+        if (hasPairingStarted) return
+        hasPairingStarted = true
+
         viewModelScope.launch {
             _state.value = PairingState.Initiating
 
@@ -54,6 +58,7 @@ class PairingViewModel @Inject constructor(
                 },
                 onFailure = { error ->
                     _state.value = PairingState.Error(error.message ?: "Pairing failed")
+                    hasPairingStarted = false
                 }
             )
         }
@@ -83,5 +88,11 @@ class PairingViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    fun retryPairing(host: String, port: Int) {
+        hasPairingStarted = false
+        _code.value = ""
+        initiatePairing(host, port)
     }
 }

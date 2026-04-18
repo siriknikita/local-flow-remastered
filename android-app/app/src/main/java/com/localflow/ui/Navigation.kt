@@ -1,8 +1,12 @@
 package com.localflow.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,33 +23,20 @@ import com.localflow.ui.pairing.PairingViewModel
 fun LocalFlowNavigation() {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "main") {
-        composable("main") {
-            val viewModel: MainViewModel = hiltViewModel()
-            val connectionState by viewModel.connectionState.collectAsState()
-
-            when (connectionState) {
-                is ConnectionState.Connected -> {
-                    MainScreen(viewModel = viewModel)
-                }
-                else -> {
-                    navController.navigate("discovery") {
-                        popUpTo("main") { inclusive = true }
-                    }
-                }
-            }
-        }
-
+    NavHost(navController = navController, startDestination = "discovery") {
         composable("discovery") {
             val viewModel: DiscoveryViewModel = hiltViewModel()
             DiscoveryScreen(
                 viewModel = viewModel,
                 onDeviceFound = { host, port, name ->
-                    navController.navigate("pairing/$host/$port/$name")
+                    navController.navigate("pairing/$host/$port/$name") {
+                        launchSingleTop = true
+                    }
                 },
                 onAlreadyPaired = {
                     navController.navigate("main") {
                         popUpTo("discovery") { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -65,6 +56,20 @@ fun LocalFlowNavigation() {
                 onPaired = {
                     navController.navigate("main") {
                         popUpTo("discovery") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable("main") {
+            val viewModel: MainViewModel = hiltViewModel()
+            MainScreen(
+                viewModel = viewModel,
+                onUnpaired = {
+                    navController.navigate("discovery") {
+                        popUpTo("main") { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
