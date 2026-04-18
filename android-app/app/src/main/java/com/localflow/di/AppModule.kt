@@ -1,7 +1,10 @@
 package com.localflow.di
 
 import android.content.Context
+import androidx.room.Room
+import com.localflow.data.local.AppDatabase
 import com.localflow.data.local.PairedDeviceStore
+import com.localflow.data.local.PendingUploadDao
 import com.localflow.data.remote.LocalFlowApi
 import com.localflow.discovery.NsdDiscoveryManager
 import com.localflow.recording.AudioRecorder
@@ -42,6 +45,15 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideUploadManager(api: LocalFlowApi): UploadManager =
-        UploadManager(api)
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "localflow.db").build()
+
+    @Provides
+    @Singleton
+    fun providePendingUploadDao(db: AppDatabase): PendingUploadDao = db.pendingUploadDao()
+
+    @Provides
+    @Singleton
+    fun provideUploadManager(api: LocalFlowApi, pendingUploadDao: PendingUploadDao): UploadManager =
+        UploadManager(api, pendingUploadDao)
 }

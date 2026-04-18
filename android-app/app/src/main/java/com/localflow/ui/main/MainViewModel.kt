@@ -43,6 +43,9 @@ class MainViewModel @Inject constructor(
 
     val uploadState: StateFlow<UploadResult> = uploadManager.uploadState
 
+    val pendingCount: StateFlow<Int> = uploadManager.pendingCount
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     private val _recordingDuration = MutableStateFlow(0L)
     val recordingDuration: StateFlow<Long> = _recordingDuration
 
@@ -54,6 +57,17 @@ class MainViewModel @Inject constructor(
                     checkConnection(device)
                 } else {
                     _connectionState.value = ConnectionState.Disconnected
+                }
+            }
+        }
+
+        // Retry pending uploads when connection state changes to Connected
+        viewModelScope.launch {
+            connectionState.collect { state ->
+                if (state is ConnectionState.Connected) {
+                    while (uploadManager.retryPending(state.device)) {
+                        // keep retrying until queue is empty or a retry fails
+                    }
                 }
             }
         }

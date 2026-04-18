@@ -1,5 +1,6 @@
 import Vapor
 import Foundation
+import UserNotifications
 
 struct UploadController: Sendable {
     let appState: AppState
@@ -65,6 +66,7 @@ struct UploadController: Sendable {
         await appState.addUpload(record)
 
         req.logger.info("Received \(bytes.count) bytes from \(deviceName), saved as \(savedFilename)")
+        sendReceivedNotification(deviceName: deviceName, filename: savedFilename)
 
         // Trigger transcription if enabled
         if config.autoTranscribe {
@@ -121,6 +123,21 @@ struct UploadController: Sendable {
                 appState.recentUploads[idx].transcriptionStatus = status
             }
         }
+    }
+
+    private func sendReceivedNotification(deviceName: String, filename: String) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = "Audio Received"
+        content.body = "From \(deviceName)"
+        content.sound = nil
+
+        let request = UNNotificationRequest(
+            identifier: "localflow-received-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        center.add(request)
     }
 
     private static func formatTimestamp(_ date: Date) -> String {
