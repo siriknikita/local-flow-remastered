@@ -36,8 +36,12 @@ final class DeviceStore: Codable {
     }()
 
     static func load() -> DeviceStore {
-        guard let data = try? Data(contentsOf: storeURL),
-              let store = try? JSONDecoder().decode(DeviceStore.self, from: data) else {
+        guard let data = try? Data(contentsOf: storeURL) else {
+            return DeviceStore()
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let store = try? decoder.decode(DeviceStore.self, from: data) else {
             return DeviceStore()
         }
         return store
