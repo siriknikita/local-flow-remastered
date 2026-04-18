@@ -38,7 +38,9 @@ final class LocalFlowServer: Sendable {
     }
 
     func stop() {
-        app?.shutdown()
-        app = nil
+        Task {
+            try? await app?.asyncShutdown()
+            app = nil
+        }
     }
 }
