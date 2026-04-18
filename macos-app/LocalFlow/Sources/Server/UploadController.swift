@@ -84,8 +84,10 @@ struct UploadController: Sendable {
 
         if swBackend.isAvailable {
             backend = swBackend
+            print("[Transcription] Using SuperWhisper backend")
         } else {
             backend = StubBackend()
+            print("[Transcription] SuperWhisper not available, using stub backend")
         }
 
         do {
@@ -108,6 +110,7 @@ struct UploadController: Sendable {
                 try? FileManager.default.removeItem(at: audioFileURL)
             }
         } catch {
+            print("[Transcription] Failed for \(audioFileURL.lastPathComponent): \(error)")
             await updateUploadStatus(uploadId: uploadId, status: .failed)
         }
     }

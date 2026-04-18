@@ -11,18 +11,23 @@ final class SuperWhisperBackend: TranscriptionBackend {
     }
 
     var isAvailable: Bool {
-        NSWorkspace.shared.runningApplications.contains {
-            $0.bundleIdentifier?.lowercased().contains("superwhisper") == true
+        // Check if SuperWhisper app exists on the system
+        let workspace = NSWorkspace.shared
+        if workspace.urlForApplication(withBundleIdentifier: "com.superwhisper.superwhisper") != nil {
+            return true
         }
+        // Fallback: check if the app can be found by name
+        if workspace.urlForApplication(toOpen: URL(string: "superwhisper://")!) != nil {
+            return true
+        }
+        return false
     }
 
     func transcribe(audioFilePath: URL) async throws -> TranscriptionResult {
-        guard isAvailable else {
-            throw TranscriptionError.superWhisperNotRunning
-        }
-
         // Snapshot existing recording folder names
         let existingFolders = try snapshotRecordingFolders()
+
+        print("[SuperWhisper] Opening \(audioFilePath.lastPathComponent) in SuperWhisper...")
 
         // Open the audio file in SuperWhisper
         let process = Process()
@@ -31,8 +36,11 @@ final class SuperWhisperBackend: TranscriptionBackend {
         try process.run()
         process.waitUntilExit()
 
+        print("[SuperWhisper] Waiting for transcription result...")
+
         // Watch for new recording folder
         let result = try await waitForNewRecording(existingFolders: existingFolders)
+        print("[SuperWhisper] Got result: \(result.text.prefix(80))...")
         return result
     }
 
@@ -63,6 +71,9 @@ final class SuperWhisperBackend: TranscriptionBackend {
                     continue // meta.json not yet written
                 }
 
+                // Wait a moment for the file to be fully written
+                try await Task.sleep(nanoseconds: 200_000_000)
+
                 if let result = try? parseMetadata(at: metaURL) {
                     return result
                 }
@@ -78,8 +89,9 @@ final class SuperWhisperBackend: TranscriptionBackend {
             throw TranscriptionError.metadataParsingFailed("Invalid JSON")
         }
 
-        guard let result = json["result"] as? String else {
-            throw TranscriptionError.metadataParsingFailed("Missing 'result' field")
+        guard let result = json["result"] as? String, !result.isEmpty else {
+            // result field missing or empty — SuperWhisper is still processing
+            throw TranscriptionError.metadataParsingFailed("Result not ready yet")
         }
 
         let rawResult = json["rawResult"] as? String
