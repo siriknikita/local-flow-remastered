@@ -13,6 +13,15 @@ struct PairingController: Sendable {
     struct PairResponse: Content {
         let status: String
         let message: String
+        let token: String?
+        let serverName: String?
+
+        init(status: String, message: String, token: String? = nil, serverName: String? = nil) {
+            self.status = status
+            self.message = message
+            self.token = token
+            self.serverName = serverName
+        }
     }
 
     struct ConfirmRequest: Content {
@@ -28,10 +37,16 @@ struct PairingController: Sendable {
     func initiatePairing(req: Request) async throws -> PairResponse {
         let pairReq = try req.content.decode(PairRequest.self)
 
-        // Check if already paired
-        let alreadyPaired = await appState.pairedDevices.contains { $0.deviceId == pairReq.deviceId }
-        if alreadyPaired {
-            return PairResponse(status: "already_paired", message: "Device is already paired")
+        // Auto-accept known devices — return existing token
+        if let existing = await appState.pairedDevices.first(where: { $0.deviceId == pairReq.deviceId }) {
+            req.logger.info("Auto-accepted known device \(pairReq.deviceName)")
+            let serverName = Host.current().localizedName ?? "Mac"
+            return PairResponse(
+                status: "already_paired",
+                message: "Device reconnected",
+                token: existing.token,
+                serverName: serverName
+            )
         }
 
         // Generate 6-digit pairing code

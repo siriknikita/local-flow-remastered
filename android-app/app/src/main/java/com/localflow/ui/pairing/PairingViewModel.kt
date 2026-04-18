@@ -1,16 +1,18 @@
 package com.localflow.ui.pairing
 
+import android.content.Context
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.localflow.data.local.PairedDeviceStore
 import com.localflow.data.remote.LocalFlowApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
 import javax.inject.Inject
 
 sealed class PairingState {
@@ -24,6 +26,7 @@ sealed class PairingState {
 
 @HiltViewModel
 class PairingViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val api: LocalFlowApi,
     private val deviceStore: PairedDeviceStore
 ) : ViewModel() {
@@ -34,7 +37,11 @@ class PairingViewModel @Inject constructor(
     private val _code = MutableStateFlow("")
     val code: StateFlow<String> = _code
 
-    private val deviceId = UUID.randomUUID().toString()
+    @Suppress("HardwareIds")
+    private val deviceId: String = Settings.Secure.getString(
+        context.contentResolver, Settings.Secure.ANDROID_ID
+    )
+
     private var hasPairingStarted = false
 
     fun setCode(code: String) {
@@ -52,15 +59,19 @@ class PairingViewModel @Inject constructor(
                 api.initiatePairing(host, port, deviceId, android.os.Build.MODEL)
             }
 
-            result.fold(
-                onSuccess = {
+            when (result) {
+                is LocalFlowApi.PairInitResult.AutoAccepted -> {
+                    deviceStore.saveDevice(result.device)
+                    _state.value = PairingState.Paired
+                }
+                is LocalFlowApi.PairInitResult.NeedCode -> {
                     _state.value = PairingState.WaitingForCode
-                },
-                onFailure = { error ->
-                    _state.value = PairingState.Error(error.message ?: "Pairing failed")
+                }
+                is LocalFlowApi.PairInitResult.Error -> {
+                    _state.value = PairingState.Error(result.message)
                     hasPairingStarted = false
                 }
-            )
+            }
         }
     }
 

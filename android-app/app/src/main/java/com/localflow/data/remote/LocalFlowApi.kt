@@ -38,7 +38,13 @@ class LocalFlowApi @Inject constructor() {
         }
     }
 
-    fun initiatePairing(host: String, port: Int, deviceId: String, deviceName: String): Result<String> {
+    sealed class PairInitResult {
+        data object NeedCode : PairInitResult()
+        data class AutoAccepted(val device: PairedDevice) : PairInitResult()
+        data class Error(val message: String) : PairInitResult()
+    }
+
+    fun initiatePairing(host: String, port: Int, deviceId: String, deviceName: String): PairInitResult {
         return try {
             val json = JSONObject().apply {
                 put("deviceId", deviceId)
@@ -55,13 +61,27 @@ class LocalFlowApi @Inject constructor() {
 
             if (response.isSuccessful) {
                 val responseJson = JSONObject(responseBody)
-                Result.success(responseJson.getString("message"))
+                val status = responseJson.getString("status")
+
+                if (status == "already_paired" && responseJson.has("token")) {
+                    // Auto-accepted — server returned token directly
+                    val device = PairedDevice(
+                        deviceId = deviceId,
+                        serverName = responseJson.getString("serverName"),
+                        host = host,
+                        port = port,
+                        token = responseJson.getString("token")
+                    )
+                    PairInitResult.AutoAccepted(device)
+                } else {
+                    PairInitResult.NeedCode
+                }
             } else {
-                Result.failure(IOException("Pairing failed: ${response.code} $responseBody"))
+                PairInitResult.Error("Pairing failed: ${response.code}")
             }
         } catch (e: Exception) {
             Timber.e(e, "Pairing initiation failed")
-            Result.failure(e)
+            PairInitResult.Error(e.message ?: "Connection failed")
         }
     }
 
