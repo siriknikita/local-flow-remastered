@@ -23,13 +23,16 @@ struct UploadController: Sendable {
 
         let deviceName = await appState.deviceName(forToken: token) ?? "Unknown"
 
-        // Parse multipart upload
-        guard let audioData = req.body.data else {
+        // Extract audio from multipart form data
+        let bytes: Data
+        if let file = try? req.content.get(File.self, at: "audio") {
+            bytes = Data(buffer: file.data)
+        } else if let bodyData = req.body.data {
+            // Fallback: treat entire body as audio (for non-multipart clients like curl)
+            bytes = Data(buffer: bodyData)
+        } else {
             throw Abort(.badRequest, reason: "No audio data in request body")
         }
-
-        let buffer = audioData
-        let bytes = Data(buffer: buffer)
 
         // Get filename from query or generate one
         let timestamp = Self.formatTimestamp(Date())
