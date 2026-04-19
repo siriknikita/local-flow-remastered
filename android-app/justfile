@@ -13,7 +13,7 @@ build *args:
     set -e
     echo "=== Building LocalFlow (debug) ==="
     ./gradlew assembleDebug {{args}}
-    APK_PATH="$(pwd)/app/build/outputs/apk/debug/app-debug.apk"
+    APK_PATH="$(pwd)/app/build/outputs/apk/debug/LocalFlow-debug.apk"
     osascript -e "set the clipboard to POSIX file \"$APK_PATH\""
     echo "=== Build successful — APK copied to clipboard ==="
 
@@ -24,7 +24,7 @@ release *args:
     set -e
     echo "=== Building LocalFlow (release) ==="
     ./gradlew assembleRelease {{args}}
-    APK_PATH="$(pwd)/app/build/outputs/apk/release/app-release.apk"
+    APK_PATH="$(pwd)/app/build/outputs/apk/release/LocalFlow-release.apk"
     osascript -e "set the clipboard to POSIX file \"$APK_PATH\""
     echo "=== Release build successful — APK copied to clipboard ==="
 
@@ -80,4 +80,4 @@ pair port code:
 # Build and install via adb install (use ANDROID_SERIAL env or -s flag if multiple devices)
 [group('deploy')]
 install: build
-    adb -s $(adb devices | grep -v 'List' | head -1 | awk '{print $1}') install -r app/build/outputs/apk/debug/app-debug.apk
+    adb -s $(adb devices | grep -v 'List' | head -1 | awk '{print $1}') install -r app/build/outputs/apk/debug/LocalFlow-debug.apk
