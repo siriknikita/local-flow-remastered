@@ -19,6 +19,7 @@ final class LocalFlowServer: @unchecked Sendable {
 
         let uploadController = UploadController(appState: appState)
         let pairingController = PairingController(appState: appState)
+        let transcriptController = TranscriptController(appState: appState)
 
         // Health check
         app.get("api", "health") { req -> String in
@@ -62,6 +63,9 @@ final class LocalFlowServer: @unchecked Sendable {
 
         // Upload endpoint (requires auth)
         app.on(.POST, "api", "upload", body: .collect(maxSize: "50mb"), use: uploadController.handleUpload)
+
+        // Transcripts endpoint (requires auth)
+        app.get("api", "transcripts", use: transcriptController.listTranscripts)
 
         self.app = app
 

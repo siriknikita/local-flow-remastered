@@ -48,6 +48,19 @@ Response: {"stopRequested": false}
 ```
 Phone polls this endpoint every ~1.5s while recording. If `stopRequested` is `true`, the phone should stop recording. The flag auto-clears after being read.
 
+### List Transcripts
+```
+GET /api/transcripts?since=2026-04-18T15:30:00Z&limit=20
+Authorization: Bearer {token}
+Response: {
+  "transcripts": [
+    {"id": "2026-04-18_15-30-00_localflow", "filename": "2026-04-18_15-30-00_localflow.txt", "text": "Transcribed text...", "createdAt": "2026-04-18T15:30:00Z"}
+  ],
+  "serverTime": "2026-04-19T10:00:00Z"
+}
+```
+Returns completed transcripts from disk. `since` (ISO8601) filters to only newer transcripts. `limit` (default 20, max 50) caps results. Use `serverTime` as the `since` value for the next poll to avoid clock-skew issues.
+
 ### Upload Audio
 ```
 POST /api/upload?filename=recording.wav

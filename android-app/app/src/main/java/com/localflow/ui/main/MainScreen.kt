@@ -1,6 +1,7 @@
 package com.localflow.ui.main
 
 import android.Manifest
+import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -9,7 +10,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,9 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.localflow.data.local.TranscriptEntity
 import com.localflow.model.ConnectionState
 import com.localflow.model.RecordingState
 import com.localflow.model.UploadResult
@@ -33,8 +42,11 @@ fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
     val recordingState by viewModel.recordingState.collectAsState()
     val uploadState by viewModel.uploadState.collectAsState()
     val recordingDuration by viewModel.recordingDuration.collectAsState()
+    val transcripts by viewModel.transcripts.collectAsState()
+    val isSyncingTranscripts by viewModel.isSyncingTranscripts.collectAsState()
     val haptic = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
+    var selectedTranscript by remember { mutableStateOf<TranscriptEntity?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -81,72 +93,127 @@ fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Connection status
-            if (connectionState is ConnectionState.Connected) {
-                val device = (connectionState as ConnectionState.Connected).device
-                Text(
-                    "Connected to ${device.serverName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else if (connectionState is ConnectionState.Error) {
-                val error = (connectionState as ConnectionState.Error).message
-                Text(
-                    error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
+            // Recording section
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Connection status
+                if (connectionState is ConnectionState.Connected) {
+                    val device = (connectionState as ConnectionState.Connected).device
+                    Text(
+                        "Connected to ${device.serverName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (connectionState is ConnectionState.Error) {
+                    val error = (connectionState as ConnectionState.Error).message
+                    Text(
+                        error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // Record button
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    RecordButton(
+                        isRecording = isRecording,
+                        isConnected = isConnected,
+                        onClick = {
+                            if (isRecording) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.stopRecording()
+                            } else {
+                                if (viewModel.hasRecordPermission()) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.startRecording()
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Duration or status
+                if (isRecording) {
+                    Text(
+                        formatDuration(recordingDuration),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Text(
+                        if (isConnected) "Tap to record" else "Not connected",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Upload status
+                UploadStatusCard(uploadState)
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Record button
-            RecordButton(
-                isRecording = isRecording,
-                isConnected = isConnected,
-                onClick = {
-                    if (isRecording) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.stopRecording()
-                    } else {
-                        if (viewModel.hasRecordPermission()) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.startRecording()
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            // Transcripts section
+            if (transcripts.isNotEmpty() || isSyncingTranscripts) {
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Recent Transcripts",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        if (isSyncingTranscripts) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
                         }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                items(transcripts, key = { it.id }) { transcript ->
+                    TranscriptCard(
+                        transcript = transcript,
+                        onClick = { selectedTranscript = transcript }
+                    )
+                }
 
-            // Duration or status
-            if (isRecording) {
-                Text(
-                    formatDuration(recordingDuration),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            } else {
-                Text(
-                    if (isConnected) "Tap to record" else "Not connected",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
+        }
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Upload status
-            UploadStatusCard(uploadState)
+        // Transcript detail dialog
+        selectedTranscript?.let { transcript ->
+            TranscriptDetailDialog(
+                transcript = transcript,
+                onDismiss = { selectedTranscript = null }
+            )
         }
     }
 }
@@ -198,6 +265,71 @@ private fun RecordButton(
             tint = MaterialTheme.colorScheme.onPrimary
         )
     }
+}
+
+@Composable
+private fun TranscriptCard(transcript: TranscriptEntity, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 4.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                transcript.text,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                DateUtils.getRelativeTimeSpanString(
+                    transcript.createdAt,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS
+                ).toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun TranscriptDetailDialog(transcript: TranscriptEntity, onDismiss: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                DateUtils.getRelativeTimeSpanString(
+                    transcript.createdAt,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS
+                ).toString(),
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(transcript.text, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                clipboardManager.setText(AnnotatedString(transcript.text))
+            }) {
+                Text("Copy")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }
 
 @Composable

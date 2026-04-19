@@ -7,12 +7,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.localflow.data.local.PairedDeviceStore
+import com.localflow.data.local.TranscriptEntity
 import com.localflow.data.remote.LocalFlowApi
 import com.localflow.model.ConnectionState
 import com.localflow.model.PairedDevice
 import com.localflow.model.RecordingState
 import com.localflow.model.UploadResult
 import com.localflow.recording.AudioRecorder
+import com.localflow.sync.TranscriptSyncManager
 import com.localflow.upload.UploadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,7 +31,8 @@ class MainViewModel @Inject constructor(
     private val pairedDeviceStore: PairedDeviceStore,
     private val audioRecorder: AudioRecorder,
     private val uploadManager: UploadManager,
-    private val api: LocalFlowApi
+    private val api: LocalFlowApi,
+    private val transcriptSyncManager: TranscriptSyncManager
 ) : ViewModel() {
 
     private val pairedDevice: StateFlow<PairedDevice?> = pairedDeviceStore.pairedDevice
@@ -49,6 +52,11 @@ class MainViewModel @Inject constructor(
     private val _recordingDuration = MutableStateFlow(0L)
     val recordingDuration: StateFlow<Long> = _recordingDuration
 
+    val transcripts: StateFlow<List<TranscriptEntity>> = transcriptSyncManager.transcripts
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val isSyncingTranscripts: StateFlow<Boolean> = transcriptSyncManager.isSyncing
+
     init {
         // Watch paired device and check connection
         viewModelScope.launch {
@@ -61,12 +69,29 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Retry pending uploads when connection state changes to Connected
+        // Retry pending uploads and sync transcripts when connected
         viewModelScope.launch {
             connectionState.collect { state ->
                 if (state is ConnectionState.Connected) {
                     while (uploadManager.retryPending(state.device)) {
                         // keep retrying until queue is empty or a retry fails
+                    }
+                }
+            }
+        }
+
+        // Sync transcripts periodically while connected
+        viewModelScope.launch {
+            connectionState.collect { state ->
+                if (state is ConnectionState.Connected) {
+                    transcriptSyncManager.sync(state.device)
+                    // Start periodic sync
+                    while (connectionState.value is ConnectionState.Connected) {
+                        delay(30_000)
+                        val currentState = connectionState.value
+                        if (currentState is ConnectionState.Connected) {
+                            transcriptSyncManager.sync(currentState.device)
+                        }
                     }
                 }
             }
@@ -164,6 +189,19 @@ class MainViewModel @Inject constructor(
             if (result is UploadResult.Success) {
                 delay(3000)
                 uploadManager.resetState()
+                // Sync transcripts after upload — give transcription time to complete
+                delay(5000)
+                (connectionState.value as? ConnectionState.Connected)?.device?.let {
+                    transcriptSyncManager.sync(it)
+                }
+            }
+        }
+    }
+
+    fun refreshTranscripts() {
+        viewModelScope.launch {
+            (connectionState.value as? ConnectionState.Connected)?.device?.let {
+                transcriptSyncManager.sync(it)
             }
         }
     }

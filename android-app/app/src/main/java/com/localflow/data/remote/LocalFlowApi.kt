@@ -158,6 +158,66 @@ class LocalFlowApi @Inject constructor() {
         }
     }
 
+    data class TranscriptItem(
+        val id: String,
+        val filename: String,
+        val text: String,
+        val createdAt: String
+    )
+
+    data class TranscriptsResponse(
+        val transcripts: List<TranscriptItem>,
+        val serverTime: String
+    )
+
+    fun fetchTranscripts(device: PairedDevice, since: String? = null, limit: Int = 20): Result<TranscriptsResponse> {
+        return try {
+            val urlBuilder = StringBuilder("http://${device.host}:${device.port}/api/transcripts?limit=$limit")
+            if (since != null) {
+                urlBuilder.append("&since=$since")
+            }
+
+            val request = Request.Builder()
+                .url(urlBuilder.toString())
+                .header("Authorization", "Bearer ${device.token}")
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            if (response.isSuccessful) {
+                val json = JSONObject(responseBody)
+                val transcriptsArray = json.getJSONArray("transcripts")
+                val transcripts = mutableListOf<TranscriptItem>()
+                for (i in 0 until transcriptsArray.length()) {
+                    val item = transcriptsArray.getJSONObject(i)
+                    transcripts.add(
+                        TranscriptItem(
+                            id = item.getString("id"),
+                            filename = item.getString("filename"),
+                            text = item.getString("text"),
+                            createdAt = item.getString("createdAt")
+                        )
+                    )
+                }
+                Result.success(
+                    TranscriptsResponse(
+                        transcripts = transcripts,
+                        serverTime = json.getString("serverTime")
+                    )
+                )
+            } else if (response.code == 401) {
+                Result.failure(IOException("Unauthorized"))
+            } else {
+                Result.failure(IOException("Failed to fetch transcripts: ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Fetch transcripts failed")
+            Result.failure(e)
+        }
+    }
+
     fun uploadAudio(device: PairedDevice, audioFile: File): Result<String> {
         return try {
             val requestBody = MultipartBody.Builder()
