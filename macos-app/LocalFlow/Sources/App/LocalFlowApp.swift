@@ -4,31 +4,27 @@ import UserNotifications
 @main
 struct LocalFlowApp: App {
     @StateObject private var appState = AppState()
-    @Environment(\.openSettings) private var openSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            MenuBarView(openSettings: { activateAndOpenSettings() })
+        Window("LocalFlow", id: "main") {
+            ContentView()
                 .environmentObject(appState)
-        } label: {
-            Image(systemName: appState.isServerRunning ? "waveform.circle.fill" : "waveform.circle")
-        }
-
-        Settings {
-            SettingsView()
-                .environmentObject(appState)
+                .environmentObject(appState.recorder)
                 .onAppear {
                     NSApp.setActivationPolicy(.regular)
                     NSApp.activate(ignoringOtherApps: true)
                 }
         }
-    }
+        .defaultSize(width: 780, height: 520)
+        .windowResizability(.contentMinSize)
 
-    private func activateAndOpenSettings() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(appState)
+        } label: {
+            Image(systemName: appState.isServerRunning ? "waveform.circle.fill" : "waveform.circle")
+        }
     }
 }
 
@@ -36,7 +32,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Request notification permissions on launch
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
                 print("[Notifications] Permission granted")
@@ -45,7 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Watch for window close to hide from dock
         windowObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: nil,

@@ -1,7 +1,7 @@
 import Vapor
 import Foundation
 
-final class LocalFlowServer: Sendable {
+final class LocalFlowServer: @unchecked Sendable {
     private var app: Application?
     private let appState: AppState
 

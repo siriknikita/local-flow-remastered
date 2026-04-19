@@ -2,11 +2,10 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
-    var openSettings: () -> Void = {}
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            // Status
             HStack(spacing: 8) {
                 Circle()
                     .fill(appState.isServerRunning ? .green : .red)
@@ -30,8 +29,10 @@ struct MenuBarView: View {
                 }
             }
 
-            menuButton("Settings...", icon: "gear") {
-                openSettings()
+            menuButton("Show LocalFlow", icon: "macwindow") {
+                openWindow(id: "main")
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
             }
 
             Divider()
