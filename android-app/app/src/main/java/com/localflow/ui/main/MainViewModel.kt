@@ -87,7 +87,7 @@ class MainViewModel @Inject constructor(
                     transcriptSyncManager.sync(state.device)
                     // Start periodic sync
                     while (connectionState.value is ConnectionState.Connected) {
-                        delay(30_000)
+                        delay(10_000)
                         val currentState = connectionState.value
                         if (currentState is ConnectionState.Connected) {
                             transcriptSyncManager.sync(currentState.device)

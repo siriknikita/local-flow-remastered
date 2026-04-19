@@ -4,9 +4,11 @@ import com.localflow.data.local.TranscriptDao
 import com.localflow.data.local.TranscriptEntity
 import com.localflow.data.remote.LocalFlowApi
 import com.localflow.model.PairedDevice
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -32,8 +34,13 @@ class TranscriptSyncManager @Inject constructor(
             val latestCreatedAt = transcriptDao.getLatestCreatedAt()
             val since = latestCreatedAt?.let { formatISO8601(it) }
 
-            val result = api.fetchTranscripts(device, since)
+            Timber.d("Syncing transcripts (since=$since)")
+
+            val result = withContext(Dispatchers.IO) {
+                api.fetchTranscripts(device, since)
+            }
             result.onSuccess { response ->
+                Timber.d("Fetched ${response.transcripts.size} transcripts")
                 val entities = response.transcripts.map { item ->
                     TranscriptEntity(
                         id = item.id,
@@ -44,10 +51,13 @@ class TranscriptSyncManager @Inject constructor(
                 }
                 if (entities.isNotEmpty()) {
                     transcriptDao.insertAll(entities)
+                    Timber.d("Saved ${entities.size} transcripts to local DB")
                 }
             }.onFailure { e ->
                 Timber.e(e, "Transcript sync failed")
             }
+        } catch (e: Exception) {
+            Timber.e(e, "Transcript sync error")
         } finally {
             _isSyncing.value = false
         }
@@ -66,6 +76,7 @@ class TranscriptSyncManager @Inject constructor(
             return try {
                 iso8601Format.parse(dateString)?.time ?: 0L
             } catch (e: Exception) {
+                Timber.w(e, "Failed to parse ISO8601 date: $dateString")
                 0L
             }
         }

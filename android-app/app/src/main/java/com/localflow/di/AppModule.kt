@@ -45,6 +45,7 @@ object AppModule {
     fun provideAudioRecorder(@ApplicationContext context: Context): AudioRecorder =
         AudioRecorder(context)
 
+    @Suppress("DEPRECATION")
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =

@@ -70,7 +70,8 @@ struct TranscriptController: Sendable {
         let limited = items.prefix(cappedLimit)
 
         let transcripts: [TranscriptItem] = limited.compactMap { item in
-            guard let text = try? String(contentsOf: item.url, encoding: .utf8) else { return nil }
+            guard let text = try? String(contentsOf: item.url, encoding: .utf8),
+                  !text.isEmpty else { return nil }
             let stem = item.url.deletingPathExtension().lastPathComponent
             return TranscriptItem(
                 id: stem,
