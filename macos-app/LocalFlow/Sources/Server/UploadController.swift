@@ -24,6 +24,14 @@ struct UploadController: Sendable {
 
         let deviceName = await appState.deviceName(forToken: token) ?? "Unknown"
 
+        // Signal that phone is uploading
+        await MainActor.run {
+            appState.activePhoneUpload = AppState.PhoneUploadState(
+                deviceName: deviceName,
+                startedAt: Date()
+            )
+        }
+
         // Extract audio from multipart form data
         let bytes: Data
         if let file = try? req.content.get(File.self, at: "audio") {
@@ -64,6 +72,11 @@ struct UploadController: Sendable {
         )
 
         await appState.addUpload(record)
+
+        // Clear active upload indicator
+        await MainActor.run {
+            appState.activePhoneUpload = nil
+        }
 
         req.logger.info("Received \(bytes.count) bytes from \(deviceName), saved as \(savedFilename)")
         sendReceivedNotification(deviceName: deviceName, filename: savedFilename)

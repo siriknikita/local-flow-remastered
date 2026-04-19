@@ -9,6 +9,36 @@ final class AppState: ObservableObject {
     @Published var recentUploads: [UploadRecord] = []
     @Published var pairedDevices: [PairedDevice] = []
     @Published var pendingPairing: PairingRequest?
+    @Published var activePhoneUpload: PhoneUploadState?
+    @Published var phoneRecording: PhoneRecordingState?
+    @Published var stopPhoneRequested = false
+
+    struct PhoneUploadState {
+        let deviceName: String
+        let startedAt: Date
+    }
+
+    struct PhoneRecordingState {
+        let deviceName: String
+        let startedAt: Date
+    }
+
+    func setPhoneRecording(deviceName: String, isRecording: Bool) {
+        if isRecording {
+            phoneRecording = PhoneRecordingState(deviceName: deviceName, startedAt: Date())
+            stopPhoneRequested = false
+        } else {
+            phoneRecording = nil
+        }
+    }
+
+    func requestPhoneStop() {
+        stopPhoneRequested = true
+    }
+
+    func clearPhoneStop() {
+        stopPhoneRequested = false
+    }
 
     let recorder = MacAudioRecorder()
     var config: AppConfiguration

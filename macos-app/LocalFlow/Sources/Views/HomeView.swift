@@ -7,6 +7,9 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                if let phoneUpload = appState.activePhoneUpload {
+                    phoneUploadIndicator(phoneUpload)
+                }
                 recordSection
                 transcriptsSection
             }
@@ -15,13 +18,45 @@ struct HomeView: View {
         .navigationTitle("Home")
     }
 
+    // MARK: - Phone Upload Indicator
+
+    private func phoneUploadIndicator(_ upload: AppState.PhoneUploadState) -> some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.small)
+
+            Image(systemName: "iphone.radiowaves.left.and.right")
+                .font(.title3)
+                .foregroundStyle(.orange)
+                .symbolEffect(.pulse)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Receiving from \(upload.deviceName)")
+                    .font(.subheadline.weight(.medium))
+                Text("Uploading audio...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: appState.activePhoneUpload != nil)
+    }
+
     // MARK: - Record Section
+
+    private var isAnyRecording: Bool {
+        recorder.isRecording || appState.phoneRecording != nil
+    }
 
     private var recordSection: some View {
         VStack(spacing: 16) {
             ZStack {
-                if recorder.isRecording {
-                    AudioWaveformView(level: recorder.audioLevel)
+                if isAnyRecording {
+                    AudioWaveformView(level: recorder.isRecording ? recorder.audioLevel : phoneAnimationLevel)
                         .frame(width: 200, height: 80)
                         .transition(.opacity)
                 }
@@ -30,6 +65,8 @@ struct HomeView: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         if recorder.isRecording {
                             appState.stopRecording()
+                        } else if appState.phoneRecording != nil {
+                            appState.requestPhoneStop()
                         } else {
                             appState.startRecording()
                         }
@@ -37,10 +74,10 @@ struct HomeView: View {
                 } label: {
                     ZStack {
                         Circle()
-                            .fill(recorder.isRecording ? .red : .accentColor)
+                            .fill(isAnyRecording ? .red : .accentColor)
                             .frame(width: 72, height: 72)
 
-                        if recorder.isRecording {
+                        if isAnyRecording {
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(.white)
                                 .frame(width: 24, height: 24)
@@ -60,6 +97,15 @@ struct HomeView: View {
                     .font(.system(.title3, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .transition(.opacity)
+            } else if let phone = appState.phoneRecording {
+                HStack(spacing: 6) {
+                    Image(systemName: "iphone")
+                        .font(.caption)
+                    Text("Recording on \(phone.deviceName)")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
             } else {
                 Text("Tap to record")
                     .font(.subheadline)
@@ -68,7 +114,13 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .animation(.easeInOut(duration: 0.2), value: recorder.isRecording)
+        .animation(.easeInOut(duration: 0.2), value: isAnyRecording)
+    }
+
+    // Simulated waveform level for phone recording (no real audio data)
+    private var phoneAnimationLevel: Float {
+        let time = Date().timeIntervalSinceReferenceDate
+        return Float(0.3 + 0.2 * sin(time * 3) + 0.1 * sin(time * 7))
     }
 
     // MARK: - Recent Transcripts

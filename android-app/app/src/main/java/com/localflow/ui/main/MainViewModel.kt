@@ -104,12 +104,35 @@ class MainViewModel @Inject constructor(
             _recordingState.value = RecordingState.Recording()
             uploadManager.resetState()
 
+            // Notify Mac that phone started recording
+            viewModelScope.launch {
+                val device = pairedDevice.value ?: return@launch
+                withContext(Dispatchers.IO) {
+                    api.notifyRecordingState(device, true)
+                }
+            }
+
             // Track duration
             viewModelScope.launch {
                 val startTime = System.currentTimeMillis()
                 while (_recordingState.value is RecordingState.Recording) {
                     _recordingDuration.value = System.currentTimeMillis() - startTime
                     delay(100)
+                }
+            }
+
+            // Poll Mac for stop command
+            viewModelScope.launch {
+                val device = pairedDevice.value ?: return@launch
+                while (_recordingState.value is RecordingState.Recording) {
+                    delay(1500)
+                    val shouldStop = withContext(Dispatchers.IO) {
+                        api.checkStatus(device)
+                    }
+                    if (shouldStop && _recordingState.value is RecordingState.Recording) {
+                        stopRecording()
+                        break
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -123,6 +146,14 @@ class MainViewModel @Inject constructor(
         val file = audioRecorder.stopRecording()
         _recordingState.value = RecordingState.Idle
         _recordingDuration.value = 0
+
+        // Notify Mac that phone stopped recording
+        viewModelScope.launch {
+            val device = pairedDevice.value ?: return@launch
+            withContext(Dispatchers.IO) {
+                api.notifyRecordingState(device, false)
+            }
+        }
 
         if (file == null) return
 

@@ -30,6 +30,24 @@ Body: {"deviceId": "uuid", "code": "847291"}
 Response: {"token": "auth-uuid", "serverName": "MacBook Name"}
 ```
 
+### Recording State Sync
+```
+POST /api/recording
+Authorization: Bearer {token}
+Content-Type: application/json
+Body: {"recording": true}
+Response: {"status": "ok"}
+```
+Phone calls this when it starts (`true`) or stops (`false`) recording. Mac UI reflects the phone's recording state on its record button.
+
+### Status (Phone Polling)
+```
+GET /api/status
+Authorization: Bearer {token}
+Response: {"stopRequested": false}
+```
+Phone polls this endpoint every ~1.5s while recording. If `stopRequested` is `true`, the phone should stop recording. The flag auto-clears after being read.
+
 ### Upload Audio
 ```
 POST /api/upload?filename=recording.wav

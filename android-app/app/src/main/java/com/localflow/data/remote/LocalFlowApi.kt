@@ -119,6 +119,45 @@ class LocalFlowApi @Inject constructor() {
         }
     }
 
+    fun notifyRecordingState(device: PairedDevice, isRecording: Boolean): Boolean {
+        return try {
+            val json = JSONObject().apply {
+                put("recording", isRecording)
+            }
+            val body = json.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url("http://${device.host}:${device.port}/api/recording")
+                .header("Authorization", "Bearer ${device.token}")
+                .post(body)
+                .build()
+            val response = client.newCall(request).execute()
+            response.isSuccessful
+        } catch (e: Exception) {
+            Timber.d(e, "Recording state notification failed")
+            false
+        }
+    }
+
+    fun checkStatus(device: PairedDevice): Boolean {
+        return try {
+            val request = Request.Builder()
+                .url("http://${device.host}:${device.port}/api/status")
+                .header("Authorization", "Bearer ${device.token}")
+                .get()
+                .build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val json = JSONObject(response.body?.string() ?: "")
+                json.optBoolean("stopRequested", false)
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Timber.d(e, "Status check failed")
+            false
+        }
+    }
+
     fun uploadAudio(device: PairedDevice, audioFile: File): Result<String> {
         return try {
             val requestBody = MultipartBody.Builder()
