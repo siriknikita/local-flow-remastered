@@ -50,6 +50,59 @@ final class AppState: ObservableObject {
         self.config = AppConfiguration.load()
         self.deviceStore = DeviceStore.load()
         self.pairedDevices = deviceStore.devices
+        loadTranscriptsFromDisk()
+    }
+
+    private func loadTranscriptsFromDisk() {
+        let transcriptionDir = URL(fileURLWithPath: config.transcriptionSaveDirectory)
+        let audioDir = URL(fileURLWithPath: config.audioSaveDirectory)
+        let fm = FileManager.default
+
+        guard let files = try? fm.contentsOfDirectory(
+            at: transcriptionDir,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: .skipsHiddenFiles
+        ) else { return }
+
+        let txtFiles = files.filter { $0.pathExtension == "txt" }
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        dateFormatter.timeZone = TimeZone.current
+
+        var records: [UploadRecord] = txtFiles.compactMap { url in
+            let stem = url.deletingPathExtension().lastPathComponent
+            let timestampStr = stem.count >= 19 ? String(stem.prefix(19)) : nil
+            let date = timestampStr.flatMap { dateFormatter.date(from: $0) }
+                ?? (try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+                ?? Date()
+
+            guard let text = try? String(contentsOf: url, encoding: .utf8),
+                  !text.isEmpty else { return nil }
+
+            // Try to find matching audio file size
+            let audioFiles = (try? fm.contentsOfDirectory(at: audioDir, includingPropertiesForKeys: nil))?.filter {
+                $0.deletingPathExtension().lastPathComponent == stem
+                || $0.lastPathComponent.hasPrefix(stem)
+            }
+            let audioFile = audioFiles?.first
+            let fileSize: Int64 = audioFile.flatMap {
+                (try? fm.attributesOfItem(atPath: $0.path))?[.size] as? Int64
+            } ?? 0
+
+            let audioFilename = audioFile?.lastPathComponent ?? "\(stem).wav"
+
+            return UploadRecord(
+                id: stem,
+                filename: audioFilename,
+                deviceName: stem.contains("_local") ? "Local Recording" : "Phone",
+                receivedAt: date,
+                fileSize: fileSize,
+                transcriptionStatus: .completed
+            )
+        }
+
+        records.sort { $0.receivedAt > $1.receivedAt }
+        recentUploads = Array(records.prefix(50))
     }
 
     // MARK: - Recording

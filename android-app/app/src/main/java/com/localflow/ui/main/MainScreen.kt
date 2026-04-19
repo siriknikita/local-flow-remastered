@@ -47,6 +47,7 @@ fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
     var selectedTranscript by remember { mutableStateOf<TranscriptEntity?>(null) }
+    var showAllTranscripts by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -172,6 +173,10 @@ fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
 
             // Transcripts section
             if (transcripts.isNotEmpty() || isSyncingTranscripts) {
+                val displayedTranscripts = if (showAllTranscripts) transcripts
+                    else transcripts.take(3)
+                val hasMore = transcripts.size > 3
+
                 item {
                     Spacer(modifier = Modifier.height(32.dp))
                     Row(
@@ -185,17 +190,27 @@ fun MainScreen(viewModel: MainViewModel, onUnpaired: () -> Unit = {}) {
                             "Recent Transcripts",
                             style = MaterialTheme.typography.titleMedium
                         )
-                        if (isSyncingTranscripts) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isSyncingTranscripts) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            if (hasMore) {
+                                TextButton(onClick = { showAllTranscripts = !showAllTranscripts }) {
+                                    Text(if (showAllTranscripts) "Show Less" else "Show All")
+                                }
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                items(transcripts, key = { it.id }) { transcript ->
+                items(displayedTranscripts, key = { it.id }) { transcript ->
                     TranscriptCard(
                         transcript = transcript,
                         onClick = { selectedTranscript = transcript }

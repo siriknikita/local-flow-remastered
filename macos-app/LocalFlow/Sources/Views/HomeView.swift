@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var recorder: MacAudioRecorder
+    @State private var showAllTranscripts = false
 
     var body: some View {
         ScrollView {
@@ -126,9 +127,25 @@ struct HomeView: View {
     // MARK: - Recent Transcripts
 
     private var transcriptsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Transcripts")
-                .font(.headline)
+        let displayCount = showAllTranscripts ? appState.recentUploads.count : 3
+        let hasMore = appState.recentUploads.count > 3
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent Transcripts")
+                    .font(.headline)
+                Spacer()
+                if hasMore {
+                    Button(showAllTranscripts ? "Show Less" : "Show All") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllTranscripts.toggle()
+                        }
+                    }
+                    .font(.subheadline)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                }
+            }
 
             if appState.recentUploads.isEmpty {
                 Text("No recordings yet. Record audio or receive from your phone.")
@@ -138,7 +155,7 @@ struct HomeView: View {
                     .padding(.vertical, 24)
             } else {
                 LazyVStack(spacing: 8) {
-                    ForEach(appState.recentUploads.prefix(15)) { upload in
+                    ForEach(appState.recentUploads.prefix(displayCount)) { upload in
                         uploadRow(upload)
                     }
                 }
